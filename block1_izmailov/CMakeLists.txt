@@ -24,6 +24,7 @@ ament_target_dependencies(
   teleop_node
   "rclcpp"
   "rrm_msgs"
+  "sensor_msgs"
 )
 ament_target_dependencies(
   logger_node
