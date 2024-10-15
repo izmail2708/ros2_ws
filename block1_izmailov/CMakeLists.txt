@@ -10,13 +10,18 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rrm_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(izmailov_interface REQUIRED)
 
 add_executable(teleop_node src/teleop_node.cpp)
-add_executable(logger_node src/logger_node.cpp)
+add_executable(logger_node src/logger_node.cpp src/save_state.cpp)
+add_executable(move_to_points_node src/move_to_points_node.cpp)
 target_include_directories(teleop_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
-target_include_directories( logger_node PUBLIC
+target_include_directories(logger_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
+target_include_directories(move_to_points_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
 target_compile_features(teleop_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
@@ -25,17 +30,20 @@ ament_target_dependencies(
   "rclcpp"
   "rrm_msgs"
   "sensor_msgs"
+  "izmailov_interface"
 )
 ament_target_dependencies(
   logger_node
   "rclcpp"
-  "sensor_msgs"
+  "izmailov_interface"
+)
+ament_target_dependencies(
+  move_to_points_node
+  "rclcpp"
+  "izmailov_interface"
 )
 
-install(TARGETS teleop_node
-  DESTINATION lib/${PROJECT_NAME})
-
-install(TARGETS teleop_node logger_node
+install(TARGETS teleop_node logger_node move_to_points_node
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

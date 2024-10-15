@@ -1,0 +1,5 @@
+int32 point_id
+float64[] joint_angles
+float64 max_speed
+---
+bool success
