@@ -11,6 +11,12 @@ find_package(rclcpp REQUIRED)
 find_package(rrm_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(izmailov_interface REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(teleop_node src/teleop_node.cpp)
 add_executable(logger_node src/logger_node.cpp src/save_state.cpp)
@@ -20,7 +26,8 @@ target_include_directories(teleop_node PUBLIC
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
 target_include_directories(logger_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
+  $<INSTALL_INTERFACE:include/${PROJECT_NAME}
+  ${EIGEN3_INCLUDE_DIRS})
 target_include_directories(move_to_points_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
@@ -35,7 +42,10 @@ ament_target_dependencies(
 ament_target_dependencies(
   logger_node
   "rclcpp"
+  "sensor_msgs"
   "izmailov_interface"
+  "tf2"
+  "tf2_ros"
 )
 ament_target_dependencies(
   move_to_points_node
@@ -45,6 +55,10 @@ ament_target_dependencies(
 
 install(TARGETS teleop_node logger_node move_to_points_node
   DESTINATION lib/${PROJECT_NAME})
+
+install(DIRECTORY launch
+DESTINATION share/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
