@@ -1,0 +1,6 @@
+string datafile_path
+string result_dir_path
+float64[] frequency
+float64[] max_time
+---
+bool success
