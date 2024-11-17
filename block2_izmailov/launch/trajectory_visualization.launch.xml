@@ -8,6 +8,8 @@
     <!-- Trajectory Visualization Node -->
     <node pkg="block2_izmailov" exec="trajectory_visualization" name="trajectory_visualization" output="screen" />
 
+    <node pkg="block2_izmailov" exec="draw_graphs.py" name="draw_graphs" output="screen" />
+
     <!-- RViz Node -->
     <node pkg="rviz2" exec="rviz2" name="rviz2" output="screen" />
 </launch>

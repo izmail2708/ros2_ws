@@ -10,7 +10,7 @@
 #include <unordered_set>
 #include <vector>
 
-#define N 4
+#define N 6
 #define DATA_PATH "/home/student/ros2_ws/block2_izmailov/src/data.csv"
 #define DIR_PATH "/home/student/ros2_ws/block2_izmailov/results/"
 
@@ -25,24 +25,22 @@ struct ArmData {
   std::vector<TimeInterval> intervals;
 };
 
-Eigen::MatrixXd createQPolynomial(int n, double t) {
+Eigen::MatrixXd createQPolynomial(int n, double t, int capacity) {
   Eigen::MatrixXd res(1, n);
+  res.setZero();
 
-  for (int i = 0; i < n; i++) {
-    res(0, i) = pow(t, i);
+  if (capacity < 0) {
+    return res;
   }
 
-  return res;
-}
-
-Eigen::MatrixXd createQDerivalPolynomial(int n, double t) {
-  Eigen::MatrixXd res(1, n);
-
   for (int i = 0; i < n; i++) {
-    if (i == 0) {
-      res(0, i) = 0;
-    } else {
-      res(0, i) = i * pow(t, i - 1);
+    if (i >= capacity) {
+      res(0, i) = pow(t, i - capacity);
+      if (capacity > 0) {
+        for (int j = 0; j < capacity; j++) {
+          res(0, i) *= (i - j);
+        }
+      }
     }
   }
 
@@ -50,14 +48,14 @@ Eigen::MatrixXd createQDerivalPolynomial(int n, double t) {
 }
 
 Eigen::MatrixXd computePolynomialCoefficients(int n, double t0, double tf,
-                                              double qt0, double qt0_dot,
-                                              double qtf, double qtf_dot) {
-  Eigen::MatrixXd A(4, 1);
-  Eigen::MatrixXd B(4, n);
+                                              double qt0, double qtf) {
+  Eigen::MatrixXd A(6, 1);
+  Eigen::MatrixXd B(6, n);
 
-  A << qt0, qt0_dot, qtf, qtf_dot;
-  B << createQPolynomial(n, t0), createQDerivalPolynomial(n, t0),
-      createQPolynomial(n, tf), createQDerivalPolynomial(n, tf);
+  A << qt0, 0, 0, qtf, 0, 0;
+  B << createQPolynomial(n, t0, 0), createQPolynomial(n, t0, 1),
+      createQPolynomial(n, t0, 2), createQPolynomial(n, tf, 0),
+      createQPolynomial(n, tf, 1), createQPolynomial(n, tf, 2);
 
   Eigen::MatrixXd C = B.colPivHouseholderQr().solve(A);
   return C;
@@ -97,7 +95,7 @@ std::vector<ArmData> parseData(const std::string &file_path, int rows,
       interval.start = data[i - 1][0];
       interval.end = data[i][0];
       interval.polynomialCoefficients = computePolynomialCoefficients(
-          N, interval.start, interval.end, data[i - 1][j], 0, data[i][j], 0);
+          N, interval.start, interval.end, data[i - 1][j], data[i][j]);
       entry.intervals.push_back(interval);
     }
 
@@ -171,7 +169,7 @@ openPositionFiles(const std::string &dirPath, const int &armsNumber) {
 
   for (int i = 0; i < armsNumber; i++) {
     std::string filePath = dirPath + "klb_" + std::to_string(i) + ".txt";
-    auto outFile = std::make_unique<std::ofstream>(filePath, std::ios::app);
+    auto outFile = std::make_unique<std::ofstream>(filePath, std::ios::trunc);
 
     if (!outFile) {
       std::cerr << "Error open: " << filePath << std::endl;

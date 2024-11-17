@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import rclpy
-from rclpy.node import Node
+import time
 import matplotlib.pyplot as plt
+from rclpy.node import Node
 
 class FileDataReader(Node):
     def __init__(self):
@@ -53,6 +54,7 @@ class FileDataReader(Node):
 
 def main(args=None):
     rclpy.init(args=args)
+    time.sleep(5)
     node = FileDataReader()
     rclpy.spin(node)
     node.destroy_node()
