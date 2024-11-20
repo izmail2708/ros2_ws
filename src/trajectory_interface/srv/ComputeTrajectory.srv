@@ -1,6 +1,7 @@
-string datafile_path
-string result_dir_path
-float64[] frequency
-float64[] max_time
+float64[] timestamps
+string[] joint_names
+float64[] positions
+uint32 rows
+uint32 cols
 ---
 bool success

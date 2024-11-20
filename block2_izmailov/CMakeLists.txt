@@ -26,12 +26,9 @@ ament_target_dependencies(trajectory_visualization "rclcpp" "sensor_msgs" "traje
 add_executable(trajectory_computation src/trajectory_computation.cpp)
 ament_target_dependencies(trajectory_computation "rclcpp" "sensor_msgs" "trajectory_interface")
 
-install(TARGETS
-  trajectory_visualization
-  DESTINATION lib/${PROJECT_NAME}
-)
 
 install(TARGETS
+  trajectory_visualization
   trajectory_computation
   DESTINATION lib/${PROJECT_NAME}
 )

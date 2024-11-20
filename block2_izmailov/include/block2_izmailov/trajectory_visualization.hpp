@@ -9,5 +9,7 @@ struct TimeInterval {
 };
 
 struct ArmData {
+  std::string name;
+
   std::vector<TimeInterval> intervals;
 };

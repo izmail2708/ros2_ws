@@ -11,7 +11,7 @@ class FileDataReader(Node):
         self.read_and_plot_data()
 
     def read_and_plot_data(self):
-        file_names = ['klb_0.txt', 'klb_2.txt']
+        file_names = ['joint1.txt', 'joint3.txt']
         dir_name = '/home/student/ros2_ws/block2_izmailov/results/'
 
         try:

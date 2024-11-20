@@ -11,6 +11,7 @@
 #include <thread>
 
 #define N 6
+#define RESULT_DIR "/home/student/ros2_ws/block2_izmailov/results/"
 
 class TrajectoryComputationService : public rclcpp::Node {
 public:
@@ -29,26 +30,33 @@ public:
       std::shared_ptr<trajectory_interface::srv::ComputeTrajectory::Response>
           response) {
     RCLCPP_INFO(this->get_logger(),
-                "Request received: datafile_path=%s, result_dir_path=%s",
-                request->datafile_path.c_str(),
-                request->result_dir_path.c_str());
+                "Received request with %d rows and %d columns.", request->rows,
+                request->cols);
 
-    std::string result_dir_path = request->result_dir_path;
-    std::string datafile_path = request->datafile_path;
+    size_t expected_size = request->rows * request->cols;
+    if (request->positions.size() != expected_size) {
+      RCLCPP_ERROR(this->get_logger(),
+                   "Invalid positions array size: %zu (expected %zu)",
+                   request->positions.size(), expected_size);
+      response->success = false;
+      return;
+    }
 
-    auto data = parseData(datafile_path, 3, 4);
+    auto data = parseData(request->timestamps, request->joint_names,
+                          request->positions, request->rows, request->cols);
 
     RCLCPP_INFO(this->get_logger(),
                 "Starting visualization with data and saving results to %s",
-                result_dir_path.c_str());
+                RESULT_DIR);
 
     std::thread visualizationThread(
         &TrajectoryComputationService::start_visualization, this, data,
-        result_dir_path);
+        std::ref(request->joint_names), RESULT_DIR);
 
     visualizationThread.join();
 
     response->success = true;
+    RCLCPP_INFO(this->get_logger(), "Trajectory computation successful.");
   }
 
 private:
@@ -91,41 +99,22 @@ private:
     return C;
   }
 
-  std::vector<ArmData> parseData(const std::string &file_path, int rows,
+  std::vector<ArmData> parseData(const std::vector<double> &timestamps,
+                                 const std::vector<std::string> &joint_names,
+                                 const std::vector<double> &positions, int rows,
                                  int cols) {
     std::vector<ArmData> res;
-    std::ifstream file(file_path);
-    if (!file.is_open()) {
-      std::cerr << "Chyba: " << file_path << std::endl;
-      return res;
-    }
-    std::string line;
 
-    int row = 0;
-    double data[rows][cols];
-
-    while (std::getline(file, line) && row < rows) {
-      std::stringstream lineStream(line);
-      std::string cell;
-      int col = 0;
-
-      while (std::getline(lineStream, cell, ',') && col < cols) {
-        double value = std::stod(cell);
-        data[row][col] = value;
-        col++;
-      }
-
-      row++;
-    }
-
-    for (int j = 1; j < cols; j++) {
+    for (int j = 0; j < cols; j++) {
       ArmData entry;
-      for (int i = 1; i < rows; i++) {
+      entry.name = joint_names[j];
+      for (int i = 0; i < rows - 1; i++) {
         TimeInterval interval;
-        interval.start = data[i - 1][0];
-        interval.end = data[i][0];
+        interval.start = timestamps[i];
+        interval.end = timestamps[i + 1];
         interval.polynomialCoefficients = computePolynomialCoefficients(
-            N, interval.start, interval.end, data[i - 1][j], data[i][j]);
+            N, interval.start, interval.end, positions[i * cols + j],
+            positions[(i + 1) * cols + j]);
         entry.intervals.push_back(interval);
       }
 
@@ -194,11 +183,12 @@ private:
   }
 
   std::vector<std::unique_ptr<std::ofstream>>
-  openPositionFiles(const std::string &dirPath, const int &armsNumber) {
+  openPositionFiles(const std::string &dirPath,
+                    const std::vector<std::string> &joint_names) {
     std::vector<std::unique_ptr<std::ofstream>> outFiles;
 
-    for (int i = 0; i < armsNumber; i++) {
-      std::string filePath = dirPath + "klb_" + std::to_string(i) + ".txt";
+    for (int i = 0; i < joint_names.size(); i++) {
+      std::string filePath = dirPath + joint_names[i] + ".txt";
       auto outFile = std::make_unique<std::ofstream>(filePath, std::ios::trunc);
 
       if (!outFile) {
@@ -213,6 +203,7 @@ private:
   }
 
   void start_visualization(std::vector<ArmData> data,
+                           std::vector<std::string> &request_joint_names,
                            std::string result_dir_path) {
     // Create a publisher for joint states
     auto publisher = this->create_publisher<sensor_msgs::msg::JointState>(
@@ -235,7 +226,8 @@ private:
     double time = 0.0;
     bool position_are_written = false;
 
-    const auto positionFiles = openPositionFiles(result_dir_path, 3);
+    const auto positionFiles =
+        openPositionFiles(result_dir_path, request_joint_names);
 
     rclcpp::Rate loop_rate(frequency); // publishing rate
 
@@ -244,12 +236,14 @@ private:
       for (size_t i = 0; i < 3; ++i) {
         joint_state.position[i] = computePosition(data, i, time);
 
-        *positionFiles[i] << "p:" << time << ":" << joint_state.position[i]
-                          << std::endl;
-        *positionFiles[i] << "v:" << time << ":"
-                          << computeVelocity(data, i, time) << std::endl;
-        *positionFiles[i] << "a:" << time << ":"
-                          << computeAcceleration(data, i, time) << std::endl;
+        if (!position_are_written) {
+          *positionFiles[i] << "p:" << time << ":" << joint_state.position[i]
+                            << std::endl;
+          *positionFiles[i] << "v:" << time << ":"
+                            << computeVelocity(data, i, time) << std::endl;
+          *positionFiles[i] << "a:" << time << ":"
+                            << computeAcceleration(data, i, time) << std::endl;
+        }
       }
 
       // Set the current time for the joint state
