@@ -14,6 +14,7 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(trajectory_interface REQUIRED)
+find_package(abb_irb4600_ikfast REQUIRED)
 
 include_directories(
   include
@@ -23,12 +24,16 @@ include_directories(
 add_executable(trajectory_visualization src/trajectory_visualization.cpp)
 ament_target_dependencies(trajectory_visualization "rclcpp" "sensor_msgs" "trajectory_interface")
 
+add_executable(ik_trajectory_visualization src/ik_trajectory_visualization.cpp)
+ament_target_dependencies(ik_trajectory_visualization "rclcpp" "sensor_msgs" "trajectory_interface" "abb_irb4600_ikfast")
+
 add_executable(trajectory_computation src/trajectory_computation.cpp)
 ament_target_dependencies(trajectory_computation "rclcpp" "sensor_msgs" "trajectory_interface")
 
 
 install(TARGETS
   trajectory_visualization
+  ik_trajectory_visualization
   trajectory_computation
   DESTINATION lib/${PROJECT_NAME}
 )

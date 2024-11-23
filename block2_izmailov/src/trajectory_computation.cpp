@@ -222,8 +222,8 @@ private:
 
     int frequency = 100;                                // Hz
     double period = 1 / static_cast<double>(frequency); // s
-    double max_time = 4.5;                              // s
-    double time = 0.0;
+    double max_time = data[0].intervals.back().end;     // s
+    double time = 0;
     bool position_are_written = false;
 
     const auto positionFiles =
@@ -233,7 +233,7 @@ private:
 
     // Loop to create a trajectory where each joint has value q(t) = t * factor
     while (rclcpp::ok()) {
-      for (size_t i = 0; i < 3; ++i) {
+      for (size_t i = 0; i < 6; ++i) {
         joint_state.position[i] = computePosition(data, i, time);
 
         if (!position_are_written) {
