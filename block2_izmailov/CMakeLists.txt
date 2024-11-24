@@ -21,10 +21,14 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
 )
 
-add_executable(trajectory_visualization src/trajectory_visualization.cpp)
+add_executable(trajectory_visualization
+  src/trajectory_visualization.cpp
+  src/trajectory_visualization_client.cpp)
 ament_target_dependencies(trajectory_visualization "rclcpp" "sensor_msgs" "trajectory_interface")
 
-add_executable(ik_trajectory_visualization src/ik_trajectory_visualization.cpp)
+add_executable(ik_trajectory_visualization
+  src/ik_trajectory_visualization.cpp
+  src/trajectory_visualization_client.cpp)
 ament_target_dependencies(ik_trajectory_visualization "rclcpp" "sensor_msgs" "trajectory_interface" "abb_irb4600_ikfast")
 
 add_executable(trajectory_computation src/trajectory_computation.cpp)

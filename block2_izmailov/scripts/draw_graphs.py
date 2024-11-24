@@ -54,7 +54,6 @@ class FileDataReader(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    time.sleep(5)
     node = FileDataReader()
     rclpy.spin(node)
     node.destroy_node()

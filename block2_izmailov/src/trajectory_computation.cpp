@@ -1,17 +1,20 @@
+#include "block2_izmailov/constants.hpp"
 #include "block2_izmailov/trajectory_visualization.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "trajectory_interface/srv/compute_trajectory.hpp"
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <fstream>
 #include <iostream>
-#include <sensor_msgs/msg/joint_state.hpp>
-#include <sstream>
 #include <string>
-#include <thread>
 
 #define N 6
-#define RESULT_DIR "/home/student/ros2_ws/block2_izmailov/results/"
+
+struct Result {
+  std::vector<double> timestamps;
+  std::vector<double> positions;
+};
 
 class TrajectoryComputationService : public rclcpp::Node {
 public:
@@ -46,16 +49,14 @@ public:
                           request->positions, request->rows, request->cols);
 
     RCLCPP_INFO(this->get_logger(),
-                "Starting visualization with data and saving results to %s",
+                "Starting computation with data and saving results to %s",
                 RESULT_DIR);
 
-    std::thread visualizationThread(
-        &TrajectoryComputationService::start_visualization, this, data,
-        std::ref(request->joint_names), RESULT_DIR);
-
-    visualizationThread.join();
+    Result result = computeTrajectory(data, request->joint_names, RESULT_DIR);
 
     response->success = true;
+    response->timestamps = result.timestamps;
+    response->positions = result.positions;
     RCLCPP_INFO(this->get_logger(), "Trajectory computation successful.");
   }
 
@@ -187,7 +188,7 @@ private:
                     const std::vector<std::string> &joint_names) {
     std::vector<std::unique_ptr<std::ofstream>> outFiles;
 
-    for (int i = 0; i < joint_names.size(); i++) {
+    for (size_t i = 0; i < joint_names.size(); i++) {
       std::string filePath = dirPath + joint_names[i] + ".txt";
       auto outFile = std::make_unique<std::ofstream>(filePath, std::ios::trunc);
 
@@ -202,74 +203,50 @@ private:
     return outFiles;
   }
 
-  void start_visualization(std::vector<ArmData> data,
+  Result computeTrajectory(std::vector<ArmData> data,
                            std::vector<std::string> &request_joint_names,
                            std::string result_dir_path) {
-    // Create a publisher for joint states
-    auto publisher = this->create_publisher<sensor_msgs::msg::JointState>(
-        "joint_states", 10);
+    Result result;
 
-    // Set joint names
-    std::vector<std::string> joint_names = {"joint_1", "joint_2", "joint_3",
-                                            "joint_4", "joint_5", "joint_6"};
-
-    // Initialize joint state message
-    sensor_msgs::msg::JointState joint_state;
-    joint_state.name = joint_names;
-    joint_state.position.resize(joint_names.size(), 0.0);
-    joint_state.velocity.resize(joint_names.size(), 0.0);
-    joint_state.effort.resize(joint_names.size(), 0.0);
-
-    int frequency = 100;                                // Hz
+    int frequency = FREQUENCY;                          // Hz
     double period = 1 / static_cast<double>(frequency); // s
     double max_time = data[0].intervals.back().end;     // s
     double time = 0;
-    bool position_are_written = false;
+    int steps = static_cast<int>(max_time / period) + 1;
 
+    std::vector<std::vector<double>> positions(6,
+                                               std::vector<double>(steps, 0.0));
     const auto positionFiles =
         openPositionFiles(result_dir_path, request_joint_names);
 
-    rclcpp::Rate loop_rate(frequency); // publishing rate
+    int counter = 0;
+    while (time <= max_time) {
+      for (size_t i = 0; i < data.size(); ++i) {
+        positions[i][counter] = computePosition(data, i, time);
 
-    // Loop to create a trajectory where each joint has value q(t) = t * factor
-    while (rclcpp::ok()) {
-      for (size_t i = 0; i < 6; ++i) {
-        joint_state.position[i] = computePosition(data, i, time);
-
-        if (!position_are_written) {
-          *positionFiles[i] << "p:" << time << ":" << joint_state.position[i]
-                            << std::endl;
-          *positionFiles[i] << "v:" << time << ":"
-                            << computeVelocity(data, i, time) << std::endl;
-          *positionFiles[i] << "a:" << time << ":"
-                            << computeAcceleration(data, i, time) << std::endl;
-        }
+        *positionFiles[i] << "p:" << time << ":" << positions[i][counter]
+                          << std::endl;
+        *positionFiles[i] << "v:" << time << ":"
+                          << computeVelocity(data, i, time) << std::endl;
+        *positionFiles[i] << "a:" << time << ":"
+                          << computeAcceleration(data, i, time) << std::endl;
       }
 
-      // Set the current time for the joint state
-      joint_state.header.stamp = this->get_clock()->now();
-
-      // Publish the joint state
-      publisher->publish(joint_state);
-
-      // Update time and sleep
+      result.timestamps.push_back(time);
       time += period;
-
-      // Loop time
-      if (time > max_time) {
-        time = 0.0;
-
-        if (!position_are_written) {
-          for (auto &file : positionFiles) {
-            file->close();
-          }
-
-          position_are_written = true;
-        }
-      }
-
-      loop_rate.sleep();
+      counter++;
     }
+
+    for (auto &file : positionFiles) {
+      file->close();
+    }
+
+    for (size_t i = 0; i < data.size(); i++) {
+      std::copy(positions[i].begin(), positions[i].end(),
+                std::back_inserter(result.positions));
+    }
+
+    return result;
   }
 };
 
