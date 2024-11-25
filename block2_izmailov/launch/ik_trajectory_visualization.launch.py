@@ -51,8 +51,8 @@ def generate_launch_description():
 
     graphs_node = Node(
         package='block2_izmailov',
-        executable='draw_graphs.py',
-        name='draw_graphs',
+        executable='draw_tool_graphs.py',
+        name='draw_tool_graphs',
         output='screen'
     )
     ld.add_action(graphs_node)

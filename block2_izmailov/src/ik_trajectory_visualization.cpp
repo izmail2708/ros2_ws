@@ -3,6 +3,7 @@
 #include <Eigen/Geometry>
 #include <cmath>
 #include <fstream>
+#include <map>
 #include <rclcpp/rclcpp.hpp>
 #include <trajectory_interface/srv/compute_trajectory.hpp>
 
@@ -45,6 +46,69 @@ double *findBestSolution(ikfast_abb::Solutions solutions,
   return best_solution;
 }
 
+void computeToolTrajectory(std::vector<double> timestamps,
+                           std::vector<double> coordinates) {
+  std::map<int, std::string> parameters_names;
+
+  parameters_names[0] = "x";
+  parameters_names[1] = "y";
+  parameters_names[2] = "z";
+  parameters_names[3] = "rx";
+  parameters_names[4] = "ry";
+  parameters_names[5] = "rz";
+
+  std::vector<std::unique_ptr<std::ofstream>> outFiles;
+
+  for (size_t i = 0; i < PARAMETERS_NUMBER; i++) {
+    std::string filePath = RESULT_DIR + parameters_names[i] + ".txt";
+    auto outFile = std::make_unique<std::ofstream>(filePath, std::ios::trunc);
+
+    if (!outFile) {
+      std::cerr << "Error open: " << filePath << std::endl;
+      continue;
+    }
+
+    outFiles.push_back(std::move(outFile));
+  }
+
+  int frequency = FREQUENCY;                          // Hz
+  double period = 1 / static_cast<double>(frequency); // s
+  double max_time = timestamps.back();                // s
+  int steps = static_cast<int>(max_time / period) + 1;
+
+  std::vector<std::vector<double>> positions(PARAMETERS_NUMBER,
+                                             std::vector<double>(steps, 0.0));
+
+  for (size_t i = 1; i < timestamps.size(); i++) {
+    for (int j = 0; j < PARAMETERS_NUMBER; j++) {
+      auto x = computePolynomialCoefficients(
+          N_ORDER, timestamps[i - 1], timestamps[i],
+          coordinates[(i - 1) * PARAMETERS_NUMBER + j],
+          coordinates[i * PARAMETERS_NUMBER + j]);
+
+      double time = timestamps[i - 1];
+      double max_time = timestamps[i];
+
+      while (time <= max_time) {
+        positions[j].push_back(getMotionValue(x, time, 0));
+        *outFiles[j] << "p:" << time << ":" << getMotionValue(x, time, 0)
+                     << std::endl;
+        *outFiles[j] << "v:" << time << ":" << getMotionValue(x, time, 1)
+                     << std::endl;
+        *outFiles[j] << "a:" << time << ":" << getMotionValue(x, time, 2)
+                     << std::endl;
+        *outFiles[j] << "t:" << time << ":" << getMotionValue(x, time, 3)
+                     << std::endl;
+        time += period;
+      }
+    }
+  }
+
+  for (auto &file : outFiles) {
+    file->close();
+  }
+}
+
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
 
@@ -83,6 +147,8 @@ int main(int argc, char **argv) {
     }
   }
   file.close();
+
+  computeToolTrajectory(timestamps, coordinates);
 
   std::vector<double> previoius_solution;
 

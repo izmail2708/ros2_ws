@@ -116,3 +116,57 @@ void TrajectoryVisualizationClient::startVisualization(
     loop_rate.sleep();
   }
 }
+
+Eigen::MatrixXd createQPolynomial(int n, double t, int order) {
+  Eigen::MatrixXd res(1, n);
+  res.setZero();
+
+  if (order < 0) {
+    return res;
+  }
+
+  for (int i = 0; i < n; i++) {
+    if (i >= order) {
+      res(0, i) = pow(t, i - order);
+      if (order > 0) {
+        for (int j = 0; j < order; j++) {
+          res(0, i) *= (i - j);
+        }
+      }
+    }
+  }
+
+  return res;
+}
+
+Eigen::MatrixXd computePolynomialCoefficients(int n, double t0, double tf,
+                                              double qt0, double qtf) {
+  Eigen::MatrixXd A(6, 1);
+  Eigen::MatrixXd B(6, n);
+
+  A << qt0, 0, 0, qtf, 0, 0;
+  B << createQPolynomial(n, t0, 0), createQPolynomial(n, t0, 1),
+      createQPolynomial(n, t0, 2), createQPolynomial(n, tf, 0),
+      createQPolynomial(n, tf, 1), createQPolynomial(n, tf, 2);
+
+  Eigen::MatrixXd C = B.colPivHouseholderQr().solve(A);
+  return C;
+}
+
+double getMotionValue(Eigen::MatrixXd polynomialCoefficients,
+                      const double &time, int order) {
+  double position = 0;
+
+  for (int i = order; i < polynomialCoefficients.size(); i++) {
+    double temp = polynomialCoefficients(i);
+    temp *= pow(time, i - order);
+    if (order > 0) {
+      for (int j = 0; j < order; j++) {
+        temp *= (i - j);
+      }
+    }
+    position += temp;
+  }
+
+  return position;
+}

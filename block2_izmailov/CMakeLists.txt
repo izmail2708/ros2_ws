@@ -31,7 +31,9 @@ add_executable(ik_trajectory_visualization
   src/trajectory_visualization_client.cpp)
 ament_target_dependencies(ik_trajectory_visualization "rclcpp" "sensor_msgs" "trajectory_interface" "abb_irb4600_ikfast")
 
-add_executable(trajectory_computation src/trajectory_computation.cpp)
+add_executable(trajectory_computation
+  src/trajectory_computation.cpp
+  src/trajectory_visualization_client.cpp)
 ament_target_dependencies(trajectory_computation "rclcpp" "sensor_msgs" "trajectory_interface")
 
 
@@ -44,6 +46,7 @@ install(TARGETS
 
 install(PROGRAMS
   scripts/draw_graphs.py
+  scripts/draw_tool_graphs.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

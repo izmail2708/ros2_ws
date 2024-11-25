@@ -9,8 +9,6 @@
 #include <iostream>
 #include <string>
 
-#define N 6
-
 struct Result {
   std::vector<double> timestamps;
   std::vector<double> positions;
@@ -64,42 +62,6 @@ private:
   rclcpp::Service<trajectory_interface::srv::ComputeTrajectory>::SharedPtr
       service_;
 
-  Eigen::MatrixXd createQPolynomial(int n, double t, int capacity) {
-    Eigen::MatrixXd res(1, n);
-    res.setZero();
-
-    if (capacity < 0) {
-      return res;
-    }
-
-    for (int i = 0; i < n; i++) {
-      if (i >= capacity) {
-        res(0, i) = pow(t, i - capacity);
-        if (capacity > 0) {
-          for (int j = 0; j < capacity; j++) {
-            res(0, i) *= (i - j);
-          }
-        }
-      }
-    }
-
-    return res;
-  }
-
-  Eigen::MatrixXd computePolynomialCoefficients(int n, double t0, double tf,
-                                                double qt0, double qtf) {
-    Eigen::MatrixXd A(6, 1);
-    Eigen::MatrixXd B(6, n);
-
-    A << qt0, 0, 0, qtf, 0, 0;
-    B << createQPolynomial(n, t0, 0), createQPolynomial(n, t0, 1),
-        createQPolynomial(n, t0, 2), createQPolynomial(n, tf, 0),
-        createQPolynomial(n, tf, 1), createQPolynomial(n, tf, 2);
-
-    Eigen::MatrixXd C = B.colPivHouseholderQr().solve(A);
-    return C;
-  }
-
   std::vector<ArmData> parseData(const std::vector<double> &timestamps,
                                  const std::vector<std::string> &joint_names,
                                  const std::vector<double> &positions, int rows,
@@ -114,7 +76,7 @@ private:
         interval.start = timestamps[i];
         interval.end = timestamps[i + 1];
         interval.polynomialCoefficients = computePolynomialCoefficients(
-            N, interval.start, interval.end, positions[i * cols + j],
+            N_ORDER, interval.start, interval.end, positions[i * cols + j],
             positions[(i + 1) * cols + j]);
         entry.intervals.push_back(interval);
       }
@@ -123,64 +85,6 @@ private:
     }
 
     return res;
-  }
-
-  double computePosition(const std::vector<ArmData> &data, const int &armNumber,
-                         const double &time) {
-    if (data.size() < armNumber) {
-      return 0.0;
-    }
-
-    double position = 0;
-
-    for (const auto &interval : data[armNumber].intervals) {
-      if (time >= interval.start && time <= interval.end) {
-        for (int i = 0; i < interval.polynomialCoefficients.size(); i++) {
-          position += pow(time, i) * interval.polynomialCoefficients(i);
-        }
-      }
-    }
-
-    return position;
-  }
-
-  double computeVelocity(const std::vector<ArmData> &data, const int &armNumber,
-                         const double &time) {
-    if (data.size() < armNumber) {
-      return 0.0;
-    }
-
-    double velocity = 0;
-
-    for (const auto &interval : data[armNumber].intervals) {
-      if (time >= interval.start && time <= interval.end) {
-        for (int i = 1; i < interval.polynomialCoefficients.size(); i++) {
-          velocity += i * pow(time, i - 1) * interval.polynomialCoefficients(i);
-        }
-      }
-    }
-
-    return velocity;
-  }
-
-  double computeAcceleration(const std::vector<ArmData> &data,
-                             const int &armNumber, const double &time) {
-    if (data.size() < armNumber) {
-      return 0.0;
-    }
-
-    double acceleration = 0;
-
-    for (const auto &interval : data[armNumber].intervals) {
-      if (time >= interval.start && time <= interval.end) {
-        for (int i = 2; i < interval.polynomialCoefficients.size(); i++) {
-          acceleration += (i - 1) * i * pow(time, i - 2) *
-                          interval.polynomialCoefficients(i);
-        }
-      }
-    }
-
-    return acceleration;
   }
 
   std::vector<std::unique_ptr<std::ofstream>>
@@ -222,14 +126,27 @@ private:
     int counter = 0;
     while (time <= max_time) {
       for (size_t i = 0; i < data.size(); ++i) {
-        positions[i][counter] = computePosition(data, i, time);
+        Eigen::MatrixXd polynomialCoefficients;
+
+        for (const auto &interval : data[i].intervals) {
+          if (time >= interval.start && time <= interval.end) {
+            polynomialCoefficients = interval.polynomialCoefficients;
+          }
+        }
+
+        positions[i][counter] = getMotionValue(polynomialCoefficients, time, 0);
 
         *positionFiles[i] << "p:" << time << ":" << positions[i][counter]
                           << std::endl;
         *positionFiles[i] << "v:" << time << ":"
-                          << computeVelocity(data, i, time) << std::endl;
+                          << getMotionValue(polynomialCoefficients, time, 1)
+                          << std::endl;
         *positionFiles[i] << "a:" << time << ":"
-                          << computeAcceleration(data, i, time) << std::endl;
+                          << getMotionValue(polynomialCoefficients, time, 2)
+                          << std::endl;
+        *positionFiles[i] << "t:" << time << ":"
+                          << getMotionValue(polynomialCoefficients, time, 3)
+                          << std::endl;
       }
 
       result.timestamps.push_back(time);

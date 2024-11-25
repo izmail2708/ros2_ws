@@ -38,3 +38,11 @@ private:
   void startVisualization(std::vector<double> timestamps,
                           std::vector<double> positions, size_t joint_count);
 };
+
+Eigen::MatrixXd createQPolynomial(int n, double t, int order);
+
+Eigen::MatrixXd computePolynomialCoefficients(int n, double t0, double tf,
+                                              double qt0, double qtf);
+
+double getMotionValue(Eigen::MatrixXd polynomialCoefficients,
+                      const double &time, int order);

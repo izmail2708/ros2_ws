@@ -4,11 +4,6 @@ import time
 import matplotlib.pyplot as plt
 from rclpy.node import Node
 
-dir = {
-    "joint1" : "klb 1",
-    "joint3" : "klb 3"
-}
-
 class FileDataReader(Node):
     def __init__(self):
         super().__init__('file_data_reader')
@@ -16,7 +11,7 @@ class FileDataReader(Node):
         self.read_and_plot_data()
 
     def read_and_plot_data(self):
-        file_names = ['joint1', 'joint3']
+        file_names = ['z', 'y', 'rz']
         dir_name = '/home/student/ros2_ws/block2_izmailov/results/'
 
         try:
@@ -47,32 +42,31 @@ class FileDataReader(Node):
 
                 plt.figure()
                 plt.plot(times, values)
-                plt.xlabel('Cas (s)')
+                plt.xlabel('Cas [s]')
                 plt.ylabel('Poloha [rad]')
                 plt.grid(True)
-                plt.title(dir[file_name])
+                plt.title(f'Poloha {file_name}')
 
                 plt.figure()
                 plt.plot(times, velocities)
-                plt.xlabel('Cas (s)')
+                plt.xlabel('Cas [s]')
                 plt.ylabel('Rychlost [rad / s]')
                 plt.grid(True)
-                plt.title(dir[file_name])
+                plt.title(f'Rychlost {file_name}')
 
                 plt.figure()
                 plt.plot(times, accelerations)
-                plt.xlabel('Cas (s)')
+                plt.xlabel('Cas [s]')
                 plt.ylabel('Zrychlenie [rad / (s ^ 2)]')
                 plt.grid(True)
-                plt.title(dir[file_name])
+                plt.title(f'Zrychlenie {file_name}')
 
                 plt.figure()
-                plt.plot(times, trh)
-                plt.xlabel('Cas (s)')
-                plt.ylabel('Trh [rad / (s ^ 3)')
+                plt.plot(times, accelerations)
+                plt.xlabel('Cas [s]')
+                plt.ylabel('Trh [rad / (s ^ 3)]')
                 plt.grid(True)
-                plt.xlabel('Cas (s)')
-                plt.title(dir[file_name])
+                plt.title(f'Trh {file_name}')
 
             plt.show()
 
